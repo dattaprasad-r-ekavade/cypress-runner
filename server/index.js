@@ -16,21 +16,52 @@ const port = 3000;
 
 const runs = new Map();
 
-// Ensure base directories exist on startup
-const baseRunsDir = path.join(__dirname, '../runs');
-const baseLogsDir = path.join(__dirname, '../logs');
+// Create base directories at startup and verify permissions
+// Use environment variable to allow custom runs directory (useful for platforms with restricted filesystem)
+const baseRunsDir = process.env.RUNS_DIR || path.join(__dirname, '../runs');
+const baseLogsDir = process.env.LOGS_DIR || path.join(__dirname, '../logs');
+
+console.log('=== Directory Setup ===');
+console.log('Base runs directory:', baseRunsDir);
+console.log('Base logs directory:', baseLogsDir);
+console.log('Process user:', process.getuid ? process.getuid() : 'N/A');
+console.log('Process gid:', process.getgid ? process.getgid() : 'N/A');
 
 try {
+    // Create directories
     if (!fs.existsSync(baseRunsDir)) {
-        fs.mkdirSync(baseRunsDir, { recursive: true });
-        console.log('Created runs directory:', baseRunsDir);
+        fs.mkdirSync(baseRunsDir, { recursive: true, mode: 0o777 });
+        console.log('✓ Created runs directory');
+    } else {
+        console.log('✓ Runs directory exists');
     }
+    
     if (!fs.existsSync(baseLogsDir)) {
-        fs.mkdirSync(baseLogsDir, { recursive: true });
-        console.log('Created logs directory:', baseLogsDir);
+        fs.mkdirSync(baseLogsDir, { recursive: true, mode: 0o777 });
+        console.log('✓ Created logs directory');
+    } else {
+        console.log('✓ Logs directory exists');
     }
+    
+    // Test write permissions by creating a test subdirectory
+    const testDir = path.join(baseRunsDir, '.test-' + Date.now());
+    fs.mkdirSync(testDir, { recursive: true, mode: 0o777 });
+    fs.rmdirSync(testDir);
+    console.log('✓ Write permissions verified');
+    
+    // Log directory stats
+    const runsDirStats = fs.statSync(baseRunsDir);
+    console.log('Runs directory permissions:', (runsDirStats.mode & 0o777).toString(8));
+    console.log('======================\n');
 } catch (error) {
-    console.error('Failed to create base directories:', error);
+    console.error('❌ Failed to setup base directories:', error);
+    console.error('Error code:', error.code);
+    console.error('Error path:', error.path);
+    console.error('Error syscall:', error.syscall);
+    console.error('\nThis usually means:');
+    console.error('1. Volume is mounted read-only');
+    console.error('2. Permission denied by container platform');
+    console.error('3. Parent directory does not exist\n');
     process.exit(1);
 }
 
@@ -70,11 +101,25 @@ app.post('/start', upload.single('file'), async (req, res) => {
         console.log('Creating directories:', { runPath, workPath });
         
         try {
+            // Ensure base runs directory exists first
+            const baseRunsDir = path.join(__dirname, '../runs');
+            if (!fs.existsSync(baseRunsDir)) {
+                console.log('Base runs directory does not exist, creating:', baseRunsDir);
+                fs.mkdirSync(baseRunsDir, { recursive: true, mode: 0o777 });
+            }
+            
+            // Now create the specific run directories
             fs.mkdirSync(runPath, { recursive: true, mode: 0o777 });
             fs.mkdirSync(workPath, { recursive: true, mode: 0o777 });
             console.log('Directories created successfully');
         } catch (dirError) {
             console.error('Failed to create directories:', dirError);
+            console.error('Error details:', JSON.stringify({
+                code: dirError.code,
+                path: dirError.path,
+                syscall: dirError.syscall,
+                errno: dirError.errno
+            }));
             throw new Error(`Failed to create run directories: ${dirError.message}`);
         }
 
