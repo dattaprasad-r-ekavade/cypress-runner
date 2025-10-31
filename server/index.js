@@ -16,6 +16,24 @@ const port = 3000;
 
 const runs = new Map();
 
+// Ensure base directories exist on startup
+const baseRunsDir = path.join(__dirname, '../runs');
+const baseLogsDir = path.join(__dirname, '../logs');
+
+try {
+    if (!fs.existsSync(baseRunsDir)) {
+        fs.mkdirSync(baseRunsDir, { recursive: true });
+        console.log('Created runs directory:', baseRunsDir);
+    }
+    if (!fs.existsSync(baseLogsDir)) {
+        fs.mkdirSync(baseLogsDir, { recursive: true });
+        console.log('Created logs directory:', baseLogsDir);
+    }
+} catch (error) {
+    console.error('Failed to create base directories:', error);
+    process.exit(1);
+}
+
 // JSON parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -49,8 +67,16 @@ app.post('/start', upload.single('file'), async (req, res) => {
         const runPath = path.join(__dirname, '../runs', runId);
         const workPath = path.join(runPath, 'work');
 
-        fs.mkdirSync(runPath, { recursive: true });
-        fs.mkdirSync(workPath, { recursive: true });
+        console.log('Creating directories:', { runPath, workPath });
+        
+        try {
+            fs.mkdirSync(runPath, { recursive: true, mode: 0o777 });
+            fs.mkdirSync(workPath, { recursive: true, mode: 0o777 });
+            console.log('Directories created successfully');
+        } catch (dirError) {
+            console.error('Failed to create directories:', dirError);
+            throw new Error(`Failed to create run directories: ${dirError.message}`);
+        }
 
         const isZip = file.originalname.toLowerCase().endsWith('.zip');
         const isSpec = /\.cy\.(js|ts|mjs)$/i.test(file.originalname);

@@ -18,8 +18,9 @@ RUN npm ci --omit=dev
 COPY server ./server
 COPY public ./public
 
-# Create necessary directories
-RUN mkdir -p /app/runs /app/logs
+# Create necessary directories with proper permissions
+RUN mkdir -p /app/runs /app/logs && \
+    chmod -R 777 /app/runs /app/logs
 
 # Expose port
 EXPOSE 3000
