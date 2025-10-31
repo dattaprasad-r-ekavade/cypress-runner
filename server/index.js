@@ -16,58 +16,81 @@ const port = 3000;
 
 const runs = new Map();
 
+// JSON parsing middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/videos', express.static(path.join(__dirname, '../runs')));
 app.use('/screenshots', express.static(path.join(__dirname, '../runs')));
+app.use('/results', express.static(path.join(__dirname, '../runs')));
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 100 * 1024 * 1024, // 100MB limit
+    }
+});
 
 app.get('/health', (req, res) => {
     res.json({ ok: true });
 });
 
 app.post('/start', upload.single('file'), async (req, res) => {
-    console.log('Uploaded file:', req.file.originalname);
-    const { file, body: {baseUrl} } = req;
-    const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${nanoid(6)}`;
-    const runPath = path.join(__dirname, '../runs', runId);
-    const workPath = path.join(runPath, 'work');
+    try {
+        if (!req.file) {
+            console.error('No file uploaded');
+            return res.status(400).json({ ok: false, error: 'No file uploaded' });
+        }
 
-    fs.mkdirSync(runPath, { recursive: true });
-    fs.mkdirSync(workPath, { recursive: true });
+        console.log('Uploaded file:', req.file.originalname);
+        const { file, body: {baseUrl} } = req;
+        const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${nanoid(6)}`;
+        const runPath = path.join(__dirname, '../runs', runId);
+        const workPath = path.join(runPath, 'work');
 
-    const isZip = file.originalname.endsWith('.zip');
-    const isSpec = /\.cy\.(js|ts|mjs)$/i.test(file.originalname);
-    
+        fs.mkdirSync(runPath, { recursive: true });
+        fs.mkdirSync(workPath, { recursive: true });
+
+        const isZip = file.originalname.toLowerCase().endsWith('.zip');
+        const isSpec = /\.cy\.(js|ts|mjs)$/i.test(file.originalname);
+        
         if (isZip) {
+            console.log('Processing ZIP file...');
             const zip = new AdmZip(file.buffer);
             zip.extractAllTo(workPath, true);
         } else if (isSpec) {
+            console.log('Processing spec file...');
             const specPath = path.join(workPath, 'cypress', 'e2e');
             fs.mkdirSync(specPath, { recursive: true });
             fs.writeFileSync(path.join(specPath, file.originalname), file.buffer);
     
-            const cypressConfigContent = `
-                        const { defineConfig } = require('cypress');
-            
-                        module.exports = defineConfig({
-                            e2e: {
-                                specPattern: 'cypress/e2e/**/*.cy.*',
-                    supportFile: false,
-                    video: true,
-                            },
-                        });
-                    `;
-                    fs.writeFileSync(path.join(workPath, 'cypress.config.cjs'), cypressConfigContent);        } else {
-        return res.status(400).json({ ok: false, error: 'Invalid file type. Please upload a .zip or a .cy.{js,ts,mjs} file.' });
+            const cypressConfigContent = `const { defineConfig } = require('cypress');
+
+module.exports = defineConfig({
+    e2e: {
+        specPattern: 'cypress/e2e/**/*.cy.*',
+        supportFile: false,
+        video: true,
+    },
+});`;
+            fs.writeFileSync(path.join(workPath, 'cypress.config.cjs'), cypressConfigContent);
+        } else {
+            console.error('Invalid file type:', file.originalname);
+            return res.status(400).json({ ok: false, error: 'Invalid file type. Please upload a .zip or a .cy.{js,ts,mjs} file.' });
+        }
+
+        runs.set(runId, { id: runId, createdAt: new Date(), status: 'queued', baseUrl, filename: file.originalname, paths: { runPath, workPath } });
+
+        console.log('Run created:', runId);
+        res.json({ ok: true, runId, stream: `/runs/${runId}/stream` });
+
+        // Run Cypress in the background
+        setImmediate(() => runCypress(runId));
+    } catch (error) {
+        console.error('Error in /start endpoint:', error);
+        res.status(500).json({ ok: false, error: error.message || 'Internal server error' });
     }
-
-    runs.set(runId, { id: runId, createdAt: new Date(), status: 'queued', baseUrl, filename: file.originalname, paths: { runPath, workPath } });
-
-    res.json({ ok: true, runId, stream: `/runs/${runId}/stream` });
-
-    // Run Cypress in the background
-    runCypress(runId);
 });
 
 app.get('/runs', (req, res) => {
@@ -270,8 +293,34 @@ function getRunResults(runId) {
     return `/results/${runId}/results/results.json`;
 }
 
-app.use('/results', express.static(path.join(__dirname, '../runs')));
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    
+    // Handle multer errors
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({ 
+            ok: false, 
+            error: `Upload error: ${err.message}` 
+        });
+    }
+    
+    // Handle other errors
+    res.status(500).json({ 
+        ok: false, 
+        error: err.message || 'Internal server error' 
+    });
+});
+
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ 
+        ok: false, 
+        error: 'Endpoint not found' 
+    });
+});
 
 app.listen(port, () => {
-    console.log(`Cypress runner listening at http://localhost:${port}`);
+    console.log(`Cypress runner listening at http://localhost:3000`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
