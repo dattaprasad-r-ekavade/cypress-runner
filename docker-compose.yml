@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  cypress-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cypress-runner
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MAX_FILE_SIZE_MB=100
+      - MAX_RUNS_RETENTION=50
+      - CLEANUP_INTERVAL_HOURS=24
+      - LOG_LEVEL=info
+    volumes:
+      # Persist test runs and logs
+      - ./runs:/app/runs
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G

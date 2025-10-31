@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cypress Video Runner</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 25px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .card-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-success { background: #10b981; color: white; }
+        .badge-danger { background: #ef4444; color: white; }
+        .badge-warning { background: #f59e0b; color: white; }
+        .badge-info { background: #3b82f6; color: white; }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        input[type="file"],
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.2s;
+        }
+
+        input[type="file"]:focus,
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #logs {
+            background: #1e293b;
+            color: #10b981;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+            line-height: 1.5;
+        }
+
+        #logs::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #logs::-webkit-scrollbar-track {
+            background: #0f172a;
+            border-radius: 4px;
+        }
+
+        #logs::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        video {
+            width: 100%;
+            display: block;
+        }
+
+        .video-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.9em;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: background 0.2s;
+        }
+
+        .btn-small:hover {
+            background: #5568d3;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+
+        .empty-state svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .run-item {
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .run-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .run-id {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #64748b;
+        }
+
+        .run-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .status-done { background: #10b981; }
+        .status-running { background: #f59e0b; animation: pulse 2s infinite; }
+        .status-failed { background: #ef4444; }
+        .status-queued { background: #3b82f6; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 0.85em;
+            color: #64748b;
+            margin-top: 5px;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 968px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Cypress Video Runner</h1>
+            <p>Upload and run your Cypress tests with real-time video recording</p>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="total-runs">0</div>
+                <div class="stat-label">Total Runs</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="success-runs">0</div>
+                <div class="stat-label">Successful</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="failed-runs">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <!-- Upload Form -->
+            <div class="card">
+                <h2 class="card-title">
+                    📤 Upload Test
+                </h2>
+                <form id="upload-form">
+                    <div class="form-group">
+                        <label for="file">
+                            Test File or Project
+                            <span style="color: #94a3b8; font-weight: 400; font-size: 0.9em;">
+                                (.zip, .cy.js, .cy.ts, .cy.mjs)
+                            </span>
+                        </label>
+                        <input type="file" id="file" name="file" accept=".zip,.cy.js,.cy.ts,.cy.mjs" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="baseUrl">
+                            Base URL
+                            <span style="color: #94a3b8; font-weight: 400; font-size: 0.9em;">
+                                (optional)
+                            </span>
+                        </label>
+                        <input type="text" id="baseUrl" name="baseUrl" placeholder="https://example.com">
+                    </div>
+                    <button type="submit" class="btn" id="submit-btn">
+                        ▶️ Run Cypress Tests
+                    </button>
+                </form>
+            </div>
+
+            <!-- Live Logs -->
+            <div class="card">
+                <h2 class="card-title">
+                    📊 Live Logs
+                    <span id="log-status"></span>
+                </h2>
+                <div id="logs-container">
+                    <div id="logs" class="empty-state">
+                        <p>🔍 Waiting for test execution...</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Logs will appear here in real-time</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Latest Result -->
+            <div class="card full-width">
+                <h2 class="card-title">
+                    🎥 Latest Test Result
+                </h2>
+                <div id="latest-result">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <p>No test results yet</p>
+                        <p style="font-size: 0.9em; margin-top: 10px;">Upload and run a test to see the video here</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Previous Runs -->
+            <div class="card full-width">
+                <h2 class="card-title">
+                    📋 Test Run History
+                </h2>
+                <div id="runs-list">
+                    <div class="empty-state">
+                        <p>No previous runs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const logs = document.getElementById('logs');
+        const logStatus = document.getElementById('log-status');
+        const latestResult = document.getElementById('latest-result');
+        const runsList = document.getElementById('runs-list');
+        let currentEventSource = null;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Reset UI
+            logs.innerHTML = '<div class="spinner"></div><p style="text-align: center; margin-top: 10px;">Starting test run...</p>';
+            latestResult.innerHTML = '<div class="spinner"></div><p style="text-align: center; margin-top: 10px;">Running tests...</p>';
+            submitBtn.disabled = true;
+            submitBtn.textContent = '⏳ Running...';
+            logStatus.innerHTML = '<span class="badge badge-warning">Running</span>';
+
+            const formData = new FormData(form);
+            
+            try {
+                const response = await fetch('/start', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const data = await response.json();
+                
+                if (data.ok) {
+                    logs.textContent = '';
+                    
+                    // Close previous event source if exists
+                    if (currentEventSource) {
+                        currentEventSource.close();
+                    }
+                    
+                    currentEventSource = new EventSource(data.stream);
+                    
+                    currentEventSource.onmessage = (event) => {
+                        if (event.data.startsWith('RUN_DONE')) {
+                            currentEventSource.close();
+                            const statusMatch = event.data.match(/status=(\w+)/);
+                            const status = statusMatch ? statusMatch[1] : 'unknown';
+                            
+                            logStatus.innerHTML = status === 'done' 
+                                ? '<span class="badge badge-success">Completed</span>'
+                                : '<span class="badge badge-danger">Failed</span>';
+                            
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = '▶️ Run Cypress Tests';
+                            
+                            setTimeout(() => loadRuns(), 500);
+                        } else {
+                            logs.textContent += event.data + '\n';
+                            logs.scrollTop = logs.scrollHeight;
+                        }
+                    };
+
+                    currentEventSource.onerror = () => {
+                        logStatus.innerHTML = '<span class="badge badge-danger">Connection Lost</span>';
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '▶️ Run Cypress Tests';
+                    };
+                } else {
+                    throw new Error(data.error || 'Failed to start test');
+                }
+            } catch (error) {
+                logs.innerHTML = `<p style="color: #ef4444;">❌ Error: ${error.message}</p>`;
+                logStatus.innerHTML = '<span class="badge badge-danger">Error</span>';
+                submitBtn.disabled = false;
+                submitBtn.textContent = '▶️ Run Cypress Tests';
+            }
+        });
+
+        async function loadRuns() {
+            try {
+                const response = await fetch('/runs');
+                const runs = await response.json();
+                
+                // Update stats
+                document.getElementById('total-runs').textContent = runs.length;
+                document.getElementById('success-runs').textContent = runs.filter(r => r.status === 'done').length;
+                document.getElementById('failed-runs').textContent = runs.filter(r => r.status === 'failed').length;
+
+                if (runs.length === 0) {
+                    runsList.innerHTML = '<div class="empty-state"><p>No previous runs</p></div>';
+                    return;
+                }
+
+                runsList.innerHTML = '';
+                runs.forEach(run => {
+                    const runItem = document.createElement('div');
+                    runItem.className = 'run-item';
+                    
+                    const statusClass = `status-${run.status}`;
+                    const statusBadge = getStatusBadge(run.status);
+                    const createdDate = new Date(run.createdAt).toLocaleString();
+                    
+                    runItem.innerHTML = `
+                        <div class="run-header">
+                            <div>
+                                <div class="status-indicator">
+                                    <span class="status-dot ${statusClass}"></span>
+                                    ${statusBadge}
+                                </div>
+                                <div class="run-id">${run.id}</div>
+                            </div>
+                            <div style="text-align: right; font-size: 0.85em; color: #64748b;">
+                                ${createdDate}
+                                ${run.filename ? `<br><strong>${run.filename}</strong>` : ''}
+                            </div>
+                        </div>
+                        ${run.baseUrl ? `<div style="font-size: 0.9em; color: #64748b; margin-bottom: 8px;">🔗 ${run.baseUrl}</div>` : ''}
+                        <div class="run-actions" id="actions-${run.id}"></div>
+                    `;
+                    
+                    runsList.appendChild(runItem);
+                    
+                    const actionsDiv = document.getElementById(`actions-${run.id}`);
+                    
+                    if (run.videos && run.videos.length > 0) {
+                        run.videos.forEach((video, idx) => {
+                            actionsDiv.innerHTML += `
+                                <button class="btn-small" onclick="loadVideo('${video}', '${run.id}')">
+                                    🎥 Video ${idx + 1}
+                                </button>
+                                <a href="${video}" download class="btn-small">💾 Download</a>
+                            `;
+                        });
+                    }
+                    
+                    if (run.screenshots && run.screenshots.length > 0) {
+                        actionsDiv.innerHTML += `
+                            <button class="btn-small" onclick="alert('${run.screenshots.length} screenshot(s) available')">
+                                📸 Screenshots (${run.screenshots.length})
+                            </button>
+                        `;
+                    }
+                    
+                    if (run.resultsJson) {
+                        actionsDiv.innerHTML += `
+                            <a href="${run.resultsJson}" download class="btn-small">📄 Results JSON</a>
+                        `;
+                    }
+                });
+
+                // Auto-load latest video
+                if (runs.length > 0 && runs[0].videos && runs[0].videos.length > 0) {
+                    loadVideo(runs[0].videos[0], runs[0].id);
+                }
+            } catch (error) {
+                console.error('Error loading runs:', error);
+            }
+        }
+
+        function getStatusBadge(status) {
+            const badges = {
+                done: '<span class="badge badge-success">✓ Passed</span>',
+                failed: '<span class="badge badge-danger">✗ Failed</span>',
+                running: '<span class="badge badge-warning">⏳ Running</span>',
+                queued: '<span class="badge badge-info">⏸ Queued</span>'
+            };
+            return badges[status] || '<span class="badge badge-info">' + status + '</span>';
+        }
+
+        function loadVideo(videoUrl, runId) {
+            latestResult.innerHTML = `
+                <div class="video-container">
+                    <video controls autoplay>
+                        <source src="${videoUrl}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <div class="video-actions">
+                    <a href="${videoUrl}" download class="btn-small">💾 Download Video</a>
+                    <button class="btn-small" onclick="navigator.clipboard.writeText('${window.location.origin}${videoUrl}')">
+                        📋 Copy Link
+                    </button>
+                </div>
+            `;
+            latestResult.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        // Load runs on page load
+        loadRuns();
+        
+        // Refresh runs every 10 seconds if there are running tests
+        setInterval(async () => {
+            const response = await fetch('/runs');
+            const runs = await response.json();
+            if (runs.some(r => r.status === 'running' || r.status === 'queued')) {
+                loadRuns();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>
